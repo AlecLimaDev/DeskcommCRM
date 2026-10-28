@@ -28,6 +28,7 @@ const REASON_LABELS: Record<(typeof CANONICAL_LOST_REASONS)[number], string> = {
 interface LoseLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
   leadId: string;
   pipelineId: string;
 }
@@ -37,6 +38,7 @@ const MAX_LEN = 500;
 export function LoseLeadDialog({
   open,
   onOpenChange,
+  onSuccess,
   leadId,
   pipelineId,
 }: LoseLeadDialogProps) {
@@ -53,6 +55,7 @@ export function LoseLeadDialog({
       await mutation.mutateAsync({ leadId, lostReason: finalReason });
       setReasonCode("");
       setOtherText("");
+      onSuccess?.();
       onOpenChange(false);
     } catch {
       // error already toasted

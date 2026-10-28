@@ -13,6 +13,7 @@ import type { Lead } from "@/lib/types/leads";
 import type { Pipeline, Stage } from "@/lib/kanban/types";
 import { StageColumn } from "./StageColumn";
 import { LeadDossier } from "./LeadDossier";
+import { LoseLeadDialog } from "./LoseLeadDialog";
 
 interface KanbanBoardProps {
   pipelineId: string;
@@ -114,6 +115,7 @@ export function KanbanBoard({
   // O dossiê é do BOARD e não da página: ele precisa do lead inteiro e do nome
   // do estágio, que só existem aqui depois do agrupamento.
   const [dossieId, setDossieId] = useState<string | null>(null);
+  const [leadParaPerderId, setLeadParaPerderId] = useState<string | null>(null);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
   const selectedLeadIds = useMemo(
     () => (selectedIds ? new Set(selectedIds) : internalSelected),
@@ -177,6 +179,12 @@ export function KanbanBoard({
       if (!lead) return;
 
       const destStageId = destination.droppableId;
+      const destStage = data.stages.find((stage) => stage.id === destStageId);
+      if (destStage?.is_lost && lead.status !== "lost") {
+        setLeadParaPerderId(lead.id);
+        return;
+      }
+
       const destList = (grouped.get(destStageId) ?? []).filter(
         (l) => l.id !== draggableId,
       );
@@ -250,6 +258,17 @@ export function KanbanBoard({
           />
         ))}
       </div>
+      {leadParaPerderId && (
+        <LoseLeadDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setLeadParaPerderId(null);
+          }}
+          onSuccess={() => setLeadParaPerderId(null)}
+          leadId={leadParaPerderId}
+          pipelineId={pipelineId}
+        />
+      )}
       {leadDoDossie && (
         <LeadDossier
           open
