@@ -125,6 +125,7 @@ export type PatchConversationInput = z.infer<typeof patchConversationSchema>;
 export const CONVERSATION_TERMINAL_STATUSES = ["closed", "archived"] as const;
 
 export const listConversationsQuerySchema = z.object({
+  contact_id: z.string().uuid().optional(),
   status: conversationStatusSchema.optional(),
   /**
    * Esconde as conversas terminais (fechada/arquivada).

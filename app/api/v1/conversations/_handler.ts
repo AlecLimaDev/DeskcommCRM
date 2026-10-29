@@ -101,6 +101,7 @@ export async function listConversationsHandler(
     .limit(q.limit + 1);
 
   if (q.status) query = query.eq("status", q.status);
+  if (q.contact_id) query = query.eq("contact_id", q.contact_id);
   // Depois do `status` de propósito: pedir um status terminal E `exclude_finished`
   // é contradição, e a resposta certa para uma contradição é lista vazia — não
   // um dos dois lados escolhido em silêncio.

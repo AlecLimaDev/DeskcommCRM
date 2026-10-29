@@ -51,6 +51,7 @@ export interface Message {
   error_message: string | null;
   body: string | null;
   media_url: string | null;
+  media_derived_text?: string | null;
   media_mime: string | null;
   media_size_bytes: number | null;
   media_storage_path: string | null;

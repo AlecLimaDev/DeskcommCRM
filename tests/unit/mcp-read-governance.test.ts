@@ -25,6 +25,7 @@ vi.mock("@/lib/audit", () => ({
 import {
   crmListConversations,
   crmGetConversation,
+  crmGetConversationHistory,
 } from "@/lib/mcp/tools/conversations";
 import { crmListLeads, crmGetLead } from "@/lib/mcp/tools/leads";
 import type { McpContext } from "@/lib/mcp/types";
@@ -59,6 +60,8 @@ function inboxOrder(rows: Array<{ id: string; last_inbound_at: string }>): strin
 
 interface Q {
   table: string;
+  eqs: Array<[string, unknown]>;
+  limit: number;
   select: string | null;
   terminal: "maybeSingle" | "then";
 }
@@ -66,21 +69,27 @@ type Resolver = (q: Q) => { data?: unknown; error?: unknown };
 
 function makeSupabase(resolve: Resolver) {
   const from = (table: string) => {
-    const q: Q = { table, select: null, terminal: "then" };
+    const q: Q = { table, select: null, terminal: "then", eqs: [], limit: 100 };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chain: any = {
       select: (cols: string) => {
         q.select = cols;
         return chain;
       },
-      eq: () => chain,
+      eq: (key: string, value: unknown) => {
+        q.eqs.push([key, value]);
+        return chain;
+      },
       is: () => chain,
       in: () => chain,
       or: () => chain,
       contains: () => chain,
       ilike: () => chain,
       order: () => chain,
-      limit: () => chain,
+      limit: (limit: number) => {
+        q.limit = limit;
+        return chain;
+      },
       maybeSingle: () => Promise.resolve(resolve({ ...q, terminal: "maybeSingle" })),
       then: (res: (v: unknown) => unknown) =>
         Promise.resolve(resolve({ ...q, terminal: "then" })).then(res),
@@ -350,4 +359,69 @@ describe("crm_get_lead / crm_list_leads — governança + shape", () => {
     expect(keys).not.toContain("owner_email");
     expect(keys).not.toContain("owner_phone");
   });
+});
+describe("leitura de contexto externo", () => {
+  it("filtra o contato no banco antes da paginação e preserva o cursor", async () => {
+    const wanted = "dddddddd-0000-4000-8000-000000000001";
+    const rows = [
+      convRow({ id: CONV_NEW, status: "closed" }),
+      convRow({ id: CONV_MID, contact_id: wanted, status: "closed" }),
+      convRow({ id: CONV_OLD, contact_id: wanted, status: "closed" }),
+    ];
+    const ctx = makeCtx((q) => {
+      expect(q.eqs).toContainEqual(["organization_id", ORG]);
+      const filtered = rows.filter((row) => q.eqs.every(([key, value]) => row[key] === value));
+      return { data: filtered.slice(0, q.limit), error: null };
+    });
+    const result = (await crmListConversations.handler({ contact_id: wanted, limit: 1, status: undefined, cursor: undefined }, ctx)) as {
+      conversations: Array<{ id: string }>;
+      has_more: boolean;
+      cursor: string | null;
+    };
+    expect(result.conversations.map((row) => row.id)).toEqual([CONV_MID]);
+    expect(result.has_more).toBe(true);
+    expect(result.cursor).toEqual(expect.any(String));
+  });
+
+  it.each(["Quero conversar amanhã.", null])(
+    "entrega a transcrição (%s) sem metadados privados",
+    async (transcript) => {
+      const ctx = makeCtx((q) => {
+        expect(q.table).toBe("messages");
+        expect(q.select?.split(", ")).toContain("media_derived_text");
+        expect(q.eqs).toContainEqual(["organization_id", ORG]);
+        expect(q.eqs).toContainEqual(["conversation_id", CONV_OLD]);
+        return {
+          data: [
+            {
+              id: "aaaaaaaa-0000-4000-8000-000000000010",
+              direction: "inbound",
+              type: "audio",
+              body: "[audio]",
+              media_derived_text: transcript,
+              media_url: "https://private.invalid/audio.ogg",
+              media_storage_path: "private/audio.ogg",
+              metadata: { token: "private" },
+              sent_via: "external_device",
+              sent_at: new Date(now).toISOString(),
+              status: "received",
+            },
+          ],
+          error: null,
+        };
+      });
+      const result = (await crmGetConversationHistory.handler(
+        { conversation_id: CONV_OLD, limit: 20, cursor: undefined },
+        ctx,
+      )) as {
+        messages: Array<Record<string, unknown>>;
+        has_more: boolean;
+      };
+      expect(result.messages[0]).toMatchObject({ body: "[audio]", media_derived_text: transcript });
+      expect(result.messages[0]).toHaveProperty("media_url");
+      expect(result.messages[0]).not.toHaveProperty("media_storage_path");
+      expect(result.messages[0]).not.toHaveProperty("metadata");
+      expect(result.has_more).toBe(false);
+    },
+  );
 });
