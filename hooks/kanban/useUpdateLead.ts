@@ -12,6 +12,7 @@ interface WinArgs {
 interface LoseArgs {
   leadId: string;
   lostReason: string;
+  lostReasonDetail?: string;
 }
 
 export function useWinLead(pipelineId: string) {
@@ -32,10 +33,11 @@ export function useWinLead(pipelineId: string) {
 export function useLoseLead(pipelineId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ leadId, lostReason }: LoseArgs) => {
+    mutationFn: async ({ leadId, lostReason, lostReasonDetail }: LoseArgs) => {
       marcarEcoLocal(leadId);
       return apiClient.post<{ data: Lead }>(`/api/v1/leads/${leadId}/lose`, {
         lost_reason: lostReason,
+        ...(lostReasonDetail ? { lost_reason_detail: lostReasonDetail } : {}),
       });
     },
     onError: showApiError,

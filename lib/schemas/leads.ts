@@ -52,7 +52,11 @@ export type CanonicalLostReason = (typeof CANONICAL_LOST_REASONS)[number];
  */
 export const loseLeadSchema = z.object({
   lost_reason: z.string().min(1, "lost_reason é obrigatório").max(500),
-});
+  lost_reason_detail: z.string().trim().max(500).optional(),
+}).refine(
+  (input) => !input.lost_reason_detail || input.lost_reason === "other",
+  { path: ["lost_reason_detail"], message: "O detalhe só se aplica a Outro motivo." },
+);
 export type LoseLeadInput = z.infer<typeof loseLeadSchema>;
 
 /**

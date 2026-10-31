@@ -34,6 +34,12 @@ describe("moveLeadSchema", () => {
 });
 
 describe("loseLeadSchema", () => {
+  it("accepts Outro motivo with a separate trimmed detail", () => {
+    expect(loseLeadSchema.parse({ lost_reason: "other", lost_reason_detail: "  Projeto adiado  " }))
+      .toEqual({ lost_reason: "other", lost_reason_detail: "Projeto adiado" });
+    expect(loseLeadSchema.safeParse({ lost_reason: "other", lost_reason_detail: "a".repeat(501) }).success).toBe(false);
+    expect(loseLeadSchema.safeParse({ lost_reason: "price", lost_reason_detail: "Detalhe indevido" }).success).toBe(false);
+  });
   it("requires lost_reason", () => {
     const r = loseLeadSchema.safeParse({});
     expect(r.success).toBe(false);

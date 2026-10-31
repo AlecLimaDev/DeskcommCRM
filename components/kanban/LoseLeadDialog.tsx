@@ -46,13 +46,18 @@ export function LoseLeadDialog({
   const [otherText, setOtherText] = useState("");
   const mutation = useLoseLead(pipelineId);
 
-  const finalReason = reasonCode === "other" ? otherText.trim() || "other" : reasonCode;
-  const disabled = !reasonCode || finalReason.length === 0 || finalReason.length > MAX_LEN || mutation.isPending;
+  const disabled = !reasonCode || otherText.length > MAX_LEN || mutation.isPending;
 
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      await mutation.mutateAsync({ leadId, lostReason: finalReason });
+      await mutation.mutateAsync({
+        leadId,
+        lostReason: reasonCode,
+        ...(reasonCode === "other" && otherText.trim()
+          ? { lostReasonDetail: otherText.trim() }
+          : {}),
+      });
       setReasonCode("");
       setOtherText("");
       onSuccess?.();

@@ -42,7 +42,12 @@ export async function POST(
         actor: { type: "user", id: authz.user.id },
         requestId,
       },
-      { leadId, desfecho: "lost", motivo: input.lost_reason },
+      {
+        leadId,
+        desfecho: "lost",
+        motivo: input.lost_reason,
+        motivoDetalhe: input.lost_reason_detail,
+      },
     );
     return ok(lead, { requestId });
   } catch (err) {

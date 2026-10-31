@@ -8,6 +8,12 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+### Corrigido
+
+- O detalhe de “Outro motivo” ao marcar um negócio como perdido deixa de causar
+  erro de validação. O código da perda permanece `other`, e a explicação informada
+  é preservada na linha do tempo do negócio.
+
 ### Adicionado
 
 - **O agente de atualização passa a fixar sozinho a versão que ficou solta**, em até 5

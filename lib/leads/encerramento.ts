@@ -34,6 +34,8 @@ export interface EncerraDemandaInput {
   desfecho: DesfechoDaDemanda;
   /** OBRIGATÓRIO em `lost` (P-03): perder sem motivo não ensina nada a ninguém. */
   motivo?: string | null;
+  /** Texto de "Outro motivo", preservado na timeline sem substituir o código. */
+  motivoDetalhe?: string | null;
 }
 
 export interface DemandaEncerrada {
@@ -153,6 +155,10 @@ export async function encerraDemanda(
 
   const a = actorAuditPayload(ctx.actor);
   const eventType = input.desfecho === "won" ? "lead.won" : "lead.lost";
+  const detalheDaPerda = input.desfecho === "lost" && input.motivo === "other"
+    ? input.motivoDetalhe?.trim() || null
+    : null;
+  const detalhePayload = detalheDaPerda ? { lost_reason_detail: detalheDaPerda } : {};
 
   await supabase
     .rpc("emit_event", {
@@ -163,7 +169,7 @@ export async function encerraDemanda(
         from_stage_id: (lead as { stage_id: string }).stage_id,
         to_stage_id: (stage as { id: string }).id,
         ...(input.desfecho === "lost"
-          ? { lost_reason: input.motivo }
+          ? { lost_reason: input.motivo, ...detalhePayload }
           : { value_cents: finalLead.value_cents, currency: finalLead.currency }),
       },
       p_metadata: { request_id: ctx.requestId, ...a.metadataActor },
@@ -187,11 +193,14 @@ export async function encerraDemanda(
     // O rótulo do tipo já diz "Demanda encerrada" na tela; o reason acrescenta o
     // DESFECHO e, na perda, o motivo — repetir o rótulo aqui deixaria a linha
     // com a mesma frase duas vezes (ver `motivoLegivel` em retorno-crm.ts).
-    reason: input.desfecho === "won" ? "Ganho" : `Perdido — ${input.motivo}`,
+    reason: input.desfecho === "won"
+      ? "Ganho"
+      : `Perdido — ${detalheDaPerda ? `Outro motivo: ${detalheDaPerda}` : input.motivo}`,
     payload: {
       desfecho: input.desfecho,
       from_stage_id: (lead as { stage_id: string }).stage_id,
       to_stage_id: (stage as { id: string }).id,
+      ...detalhePayload,
     },
   });
   if (!atividade.ok) {
